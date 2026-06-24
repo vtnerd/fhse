@@ -81,6 +81,7 @@ target_link_libraries(fhse PUBLIC fhse-public ${SODIUM_LIBRARY} PRIVATE fhse-pri
 
 option(FHSE_TESTS "Enable FHSE tests (requires c++)" OFF)
 if (FHSE_TESTS)
+  enable_testing()
   enable_language(CXX)
   set(CMAKE_CXX_STANDARD 17)
   set(CMAKE_CXX_STANDARD_REQUIRED ON)
