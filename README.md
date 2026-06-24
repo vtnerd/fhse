@@ -1,5 +1,8 @@
 # FHSE (FIDO2 Hmac-Secret Encryption)
 ## About
+TL;DR => Encrypt files using password and 1+ FIDO2 security keys. The process
+is quantum-safe and guarantees 256-bit security (due to FIDO2 spec).
+
 This C library (with C++ bindings) provides hardware backed (FIDO2) security
 for encryption keys in addition to a traditional password. The user typically
 enters a password to unlock the FIDO2 details, and then uses a FIDO2 key (from
