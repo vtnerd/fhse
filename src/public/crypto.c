@@ -40,12 +40,13 @@
 #ifdef FHSE_LIBSODIUM
   #include <sodium/core.h>
   #include <sodium/crypto_aead_xchacha20poly1305.h>
-  #include <sodium/crypto_kdf_hkdf_sha256.h>
+  #include <sodium/crypto_kdf_blake2b.h>
   #include <sodium/crypto_pwhash_argon2id.h>
   #include <sodium/randombytes.h>
 
-  #define FHSE_CRYPTO_KDF_NAME "hkdf_sha256"
-  #define FHSE_CRYPTO_KDF_KEY_SIZE crypto_kdf_hkdf_sha256_KEYBYTES
+  #define FHSE_CRYPTO_KDF_NAME "kdf_blake2b"
+  #define FHSE_CRYPTO_KDF_KEY_SIZE crypto_kdf_blake2b_KEYBYTES
+  #define FHSE_CRYPTO_KDF_DOMAIN_SIZE crypto_kdf_blake2b_CONTEXTBYTES
 
   #define FHSE_CRYPTO_PWHASH_NAME "argon2id13"
   #define FHSE_CRYPTO_PWHASH_SALT_SIZE crypto_pwhash_argon2id_SALTBYTES
@@ -57,7 +58,7 @@
   #define FHSE_CRYPTO_AEAD_TAG_SIZE crypto_aead_xchacha20poly1305_ietf_ABYTES
   #define FHSE_CRYPTO_AEAD_NONCE_SIZE crypto_aead_xchacha20poly1305_ietf_NPUBBYTES
 
-  int fhse_crypto_random(fhse_view_t out, void* context)
+  static int fhse_crypto_random(fhse_view_t out, void* context)
   {
     if (sodium_init() == -1)
       return fhse_crypto_failure;
@@ -65,10 +66,12 @@
     return fhse_success;
   }
 
-  int fhse_crypto_kdf(fhse_bytes_t* name, fhse_view_t out, fhse_cview_t in, fhse_cview_t domain, void* context)
+  static int fhse_crypto_kdf(fhse_bytes_t* name, fhse_view_t out, fhse_cview_t in, fhse_cview_t domain, void* context)
   {
     fhse_memory_t const* memory = (fhse_memory_t const*)context;
     if (!name || !memory || !memory->realloc || !memory->free)
+      return fhse_bad_argument;
+    if (FHSE_CRYPTO_KDF_DOMAIN_SIZE < domain.length)
       return fhse_bad_argument;
     if (sodium_init() == -1)
       return fhse_crypto_failure;
@@ -81,25 +84,13 @@
     else if (fhse_bytes_from_string(name, FHSE_CRYPTO_KDF_NAME, memory) != fhse_success)
       return fhse_bad_alloc;
 
-    fhse_sbytes_t expanded = {0};
-    if (in.length < FHSE_CRYPTO_KDF_KEY_SIZE)
-    {
-      if (fhse_sbytes_realloc(&expanded, FHSE_CRYPTO_KDF_KEY_SIZE, memory) != fhse_success)
-        return fhse_bad_alloc;
+    unsigned char key[FHSE_CRYPTO_KDF_KEY_SIZE] = {0};
+    memcpy(key, in.data, in.length < sizeof(key) ? in.length : sizeof(key));
 
-      memset(expanded.data, 0, expanded.length);
-      memcpy(expanded.data, in.data, in.length);
+    char ctx[FHSE_CRYPTO_KDF_DOMAIN_SIZE] = {0};
+    memcpy(ctx, domain.data, domain.length < sizeof(ctx) ? domain.length : sizeof(ctx));
 
-      in.data = expanded.data;
-      in.length = expanded.length;
-    }
-
-    const int rc = crypto_kdf_hkdf_sha256_expand(
-      out.data, out.length, (const char*)domain.data, domain.length, in.data
-    );
-
-    fhse_sbytes_free(&expanded, memory);
-    if (rc == 0)
+    if (crypto_kdf_blake2b_derive_from_key(out.data, out.length, 0, ctx, key) == 0)
       return fhse_success;
     return fhse_crypto_failure;
   }
@@ -230,7 +221,7 @@
     return fhse_sbytes_realloc(out, length, memory);
   }
 
-  int fhse_crypto_aead(fhse_sbytes_t* out, fhse_aead_t* state, fhse_cview_t key, void* context)
+  static int fhse_crypto_aead(fhse_sbytes_t* out, fhse_aead_t* state, fhse_cview_t key, void* context)
   {
     if (!state)
       return fhse_bad_argument;
