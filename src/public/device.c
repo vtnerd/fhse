@@ -31,9 +31,8 @@
 #ifndef FHSE_LIBFIDO2
 int fhse_device_construct(fhse_device_t** self, const char* path, struct fhse_memory_t const* memory)
 { return fhse_bad_argument; }
-void fhse_device_free(fhse_device_t** self) { return fhse_bad_argument; }
-void fhse_device_sbytes_free(fhse_device_t* self, fhse_sbytes_t* bytes)
-{ return fhse_bad_argument; }
+void fhse_device_free(fhse_device_t** self) {}
+void fhse_device_sbytes_free(fhse_device_t* self, fhse_sbytes_t* bytes) {}
 int fhse_device_generate_cred(fhse_device_t* self, fhse_sbytes_t* out, fhse_cview_t userid, const char* pin)
 { return fhse_bad_argument; }
 int fhse_device_get_hmac_secret(fhse_device_t* self, fhse_sbytes_t* out, fhse_cviews_t keys, fhse_cview_t salt, const char* pin)
