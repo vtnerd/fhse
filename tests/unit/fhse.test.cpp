@@ -202,7 +202,7 @@ FHSE_CASE("cpp interface")
       EXPECT(secret.add_key(to_view(cred1), to_view(key1)) == fhse::status::success);
       EXPECT(secret.add_key(to_view(cred2), to_view(key2)) == fhse::status::success);
       EXPECT(secret.add_key(to_view(id3), to_view(key3)) == fhse::status::success);
-      EXPECT(secret.cred_count() == 2);
+      EXPECT(secret.cred_count() == 3);
       EXPECT(secret.cred(0) == to_view(cred1));
       EXPECT(secret.cred(1) == to_view(cred2));
       EXPECT(secret.cred(2) == to_view(id3));
