@@ -54,7 +54,7 @@ int fhse_core_store(fhse_core_t* self, fhse_sbytes_t* dest, fhse_memory_t const*
 
 //! Open "root" `secret`/`z85_secret`. Must use `fhse_core_open` first.
 int fhse_core_unlock(fhse_core_t* self, fhse_cview_t hmac_secret, fhse_crypto_t const* crypto, fhse_memory_t const* memory);
-int fhse_core_add_key(fhse_core_t* self, fhse_cview_t hmac_secret, fhse_crypto_t const* crypto, fhse_memory_t const* memory);
+int fhse_core_add_key(fhse_core_t* self, fhse_cview_t fido_cred, fhse_cview_t hmac_secret, fhse_crypto_t const* crypto, fhse_memory_t const* memory);
 int fhse_core_remove_key(fhse_core_t* self, fhse_cview_t hmac_secret, fhse_crypto_t const* crypto, fhse_memory_t const* memory);
 
 int fhse_core_free(fhse_core_t* self, fhse_memory_t const* memory);

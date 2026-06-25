@@ -37,13 +37,6 @@
   extern "C" {
 #endif
  
-//! Secure (RAM locked and wiped) bytes, which implies ownership
-typedef struct fhse_sbytes_t
-{
-  unsigned char* data;
-  size_t length;
-} fhse_sbytes_t;
-
 int fhse_sbytes_realloc(fhse_sbytes_t* self, size_t length, fhse_memory_t const* memory);
 int fhse_sbytes_copy(fhse_sbytes_t* out, fhse_sbytes_t in, fhse_memory_t const* memory);
 int fhse_sbytes_move(fhse_sbytes_t* out, fhse_sbytes_t* src, fhse_memory_t const* memory);

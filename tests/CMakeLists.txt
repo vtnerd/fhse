@@ -27,3 +27,11 @@
 # THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 add_subdirectory(unit)
+
+set(EXTRA_LIBS "")
+add_executable(fhse-device-test device.cpp)
+if (FHSE_USE_LIBFIDO2)
+  set(EXTRA_LIBS ${FIDO2_LIBRARY})
+  target_compile_definitions(fhse-device-test PUBLIC "USE_LIBFIDO2")
+endif ()
+target_link_libraries(fhse-device-test fhse ${EXTRA_LIBS})

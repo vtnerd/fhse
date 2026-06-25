@@ -48,17 +48,28 @@ add_library(fhse-dependencies INTERFACE)
 find_path(CBOR_INCLUDE_PATH cbor.h)
 find_library(CBOR_LIBRARY cbor)
 if (NOT CBOR_INCLUDE_PATH OR NOT CBOR_LIBRARY)
-  message(FATAL_ERROR "Faield to find libcbor")
+  message(FATAL_ERROR "Failed to find libcbor")
+endif ()
+
+set(COMPILE_GUARDS "")
+option(FHSE_USE_LIBFIDO2 "Use libfido2 for fido2 key interactivity" ON)
+if (FHSE_USE_LIBFIDO2)
+  find_path(FIDO2_INCLUDE_PATH fido.h)
+  find_library(FIDO2_LIBRARY fido)
+  if (NOT FIDO2_INCLUDE_PATH OR NOT FIDO2_LIBRARY)
+    message(FATAL_ERROR "Failed to find libfido2")
+  endif ()
+  list(APPEND COMPILE_GUARDS "FHSE_LIBFIDO2")
 endif ()
 
 option(FHSE_USE_LIBSODIUM "Use libsodium for crypto" ON)
 if (FHSE_USE_LIBSODIUM)
   find_path(SODIUM_INCLUDE_PATH sodium/core.h)
   find_library(SODIUM_LIBRARY sodium)
-  target_compile_definitions(fhse-dependencies INTERFACE FHSE_LIBSODIUM)
   if (NOT SODIUM_INCLUDE_PATH OR NOT SODIUM_LIBRARY)
     message(FATAL_ERROR "Failed to find libsodium")
   endif ()
+  list(APPEND COMPILE_GUARDS "FHSE_LIBSODIUM")
 endif ()
 
 target_include_directories(fhse-dependencies
@@ -67,12 +78,15 @@ target_include_directories(fhse-dependencies
     "${CMAKE_CURRENT_SOURCE_DIR}/src"
     ${CBOR_INCLUDE_PATH}
     ${SODIUM_INCLUDE_PATH}
+    ${FIDO2_INCLUDE_PATH}
 )
 target_link_libraries(fhse-dependencies
   INTERFACE
     ${CBOR_LIBRARY}
     ${SODIUM_LIBRARY}
+    ${FIDO2_LIBRARY}
 )
+target_compile_definitions(fhse-dependencies INTERFACE ${COMPILE_GUARDS})
 
 add_subdirectory(src)
 add_library(fhse)

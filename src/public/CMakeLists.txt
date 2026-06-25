@@ -29,6 +29,7 @@
 set(SOURCE_FILES
   bytes.c
   crypto.c
+  device.c
   memory.c
   sbytes.c
   secret.c

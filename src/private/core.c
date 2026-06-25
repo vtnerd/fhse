@@ -162,11 +162,11 @@ int fhse_core_free(fhse_core_t* self, fhse_memory_t const* memory)
   return fhse_success;
 }
 
-int fhse_core_add_key(fhse_core_t* self, fhse_cview_t hmac_secret, fhse_crypto_t const* crypto, fhse_memory_t const* memory)
+int fhse_core_add_key(fhse_core_t* self, fhse_cview_t fido_cred, fhse_cview_t hmac_secret, fhse_crypto_t const* crypto, fhse_memory_t const* memory)
 {
   if (!self || !self->secret.data)
     return fhse_bad_argument;
-  return fhse_keys_add(&self->keys, fhse_sbytes_to_cview(self->secret), hmac_secret, crypto, memory);
+  return fhse_keys_add(&self->keys, fhse_sbytes_to_cview(self->secret), fido_cred, hmac_secret, crypto, memory);
 }
 
 int fhse_core_remove_key(fhse_core_t* self, fhse_cview_t hmac_secret, fhse_crypto_t const* crypto, fhse_memory_t const* memory)

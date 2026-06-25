@@ -44,11 +44,13 @@ enum fhse_error
   fhse_crypto_failure,
   fhse_decryption_failure,
   fhse_duplicate_key,
+  fhse_fido_failure,
+  fhse_fido_needs_pin,
   fhse_key_unavailable,
   fhse_mlock_failure
 };
 
-//! Primary object for client
+typedef struct fhse_device_t fhse_device_t;
 typedef struct fhse_secret_t fhse_secret_t;
 struct fhse_memory_t;
 struct fhse_crypto_t;
@@ -67,12 +69,30 @@ typedef struct fhse_cview_t
   size_t length;
 } fhse_cview_t;
 
+//! 0+ `fhse_cview_t` objects in an array.
+typedef struct fhse_cviews_t
+{
+  fhse_cview_t const* data;
+  size_t count;
+} fhse_cviews_t;
+
 // Generic bytes with ownership
 typedef struct fhse_bytes_t
 {
   unsigned char* data;
   size_t length;
 } fhse_bytes_t;
+
+//! Secure (RAM locked and wiped) bytes, which implies ownership
+typedef struct fhse_sbytes_t
+{
+  unsigned char* data;
+  size_t length;
+} fhse_sbytes_t;
+
+//
+// fhse_secret_t functions
+//
 
 //! pass `NULL` to `memory` or `crypto` for defaults
 int fhse_secret_construct(
@@ -83,7 +103,7 @@ int fhse_secret_construct(
 void fhse_secret_free(fhse_secret_t** self);
 
 //! Free `bytes` allocated/returned by `self`
-int fhse_free(fhse_secret_t* self, fhse_bytes_t* bytes);
+int fhse_secret_bytes_free(fhse_secret_t* self, fhse_bytes_t* bytes);
 
 //! `NULL` if not-restored or null terminated z85 encoded secret. Non-owning.
 const char* fhse_secret_get_ascii(fhse_secret_t* self);
@@ -101,10 +121,26 @@ int fhse_secret_open(fhse_secret_t* self, fhse_cview_t source, fhse_cview_t pass
 //! Pack entire state into `out` for storage. Lib allocates, user frees
 int fhse_secret_store(fhse_secret_t* self, fhse_bytes_t* out);
 
+size_t fhse_secret_cred_count(fhse_secret_t* self);
+fhse_cview_t fhse_secret_cred(fhse_secret_t* self, size_t i);
+
 int fhse_secret_unlock(fhse_secret_t* self, fhse_cview_t hmac_secret);
 
-int fhse_secret_add_key(fhse_secret_t* self, fhse_cview_t hmac_secret);
+int fhse_secret_add_key(fhse_secret_t* self, fhse_cview_t fido_cred, fhse_cview_t hmac_secret);
 int fhse_secret_remove_key(fhse_secret_t* self, fhse_cview_t hmac_secret);
+
+//
+// fhse_device_t functions
+//
+
+int fhse_device_construct(fhse_device_t** self, const char* path, struct fhse_memory_t const* memory);
+void fhse_device_free(fhse_device_t** self);
+
+void fhse_device_sbytes_free(fhse_device_t* self, fhse_sbytes_t* bytes);
+
+int fhse_device_generate_cred(fhse_device_t* self, fhse_sbytes_t* out, fhse_cview_t userid, const char* pin);
+int fhse_device_get_hmac_secret(fhse_device_t* self, fhse_sbytes_t* out, fhse_cviews_t keys, fhse_cview_t salt, const char* pin);
+int fhse_device_cancel(fhse_device_t* self);
 
 #ifdef __cplusplus
   }

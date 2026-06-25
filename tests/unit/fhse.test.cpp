@@ -44,6 +44,9 @@ namespace
     0xe1, 0xe4, 0x2e, 0x86, 0xb7, 0xa4, 0x74, 0x22
   };
 
+  constexpr const char cred1[] =" key 1 id";
+  constexpr const char cred2[] =" key 2 id";
+  constexpr const char id3[] =" key 3 id";
   constexpr const char key1[] = "key 1 hmac secret";
   constexpr const char key2[] = "key 2 hmac secret";
   constexpr const char key3[] = "key 3 hmac secret";
@@ -81,6 +84,8 @@ FHSE_CASE("cpp interface")
     EXPECT(secret.get_secret() == fhse_cview_t{});
     EXPECT(secret.fido_userid() == fhse_cview_t{});
     EXPECT(secret.fido_salt() == fhse_cview_t{});
+    EXPECT(secret.cred_count() == 0);
+    EXPECT(secret.cred(10) == fhse_cview_t{});
     EXPECT(secret.unlock(to_view(key1)) == fhse::status(fhse_bad_argument));
     {
       std::vector<std::uint8_t> empty;
@@ -91,6 +96,7 @@ FHSE_CASE("cpp interface")
     EXPECT(secret.create(to_view(pass1), to_view(seed1)) == fhse::status::success);
     EXPECT(secret.fido_userid().length == 64);
     EXPECT(secret.fido_salt().length == 32);
+    EXPECT(secret.cred_count() == 0);
 
     EXPECT(secret.get_ascii_secret() != nullptr);
     EXPECT(secret.get_ascii_secret() == std::string{seed1_z85});
@@ -123,6 +129,7 @@ FHSE_CASE("cpp interface")
     SECTION("store no keys")
     {
       std::vector<std::uint8_t> empty;
+      EXPECT(secret.cred_count() == 0);
       EXPECT(secret.store(empty) == fhse::status(fhse_bad_argument));
       EXPECT(empty.empty());
     }
@@ -130,9 +137,11 @@ FHSE_CASE("cpp interface")
     SECTION("add keys and open")
     {
       std::vector<std::uint8_t> cbor;
-      EXPECT(secret.add_key(to_view(key1)) == fhse::status::success);
-      EXPECT(secret.add_key(to_view(key1)) == fhse::status(fhse_duplicate_key));
+      EXPECT(secret.add_key(to_view(cred1), to_view(key1)) == fhse::status::success);
+      EXPECT(secret.add_key(to_view(cred2), to_view(key1)) == fhse::status(fhse_duplicate_key));
       EXPECT(secret.unlock(to_view(key1)) == fhse::status(fhse_bad_argument));
+      EXPECT(secret.cred_count() == 1);
+      EXPECT(secret.cred(0) == to_view(cred1));
       EXPECT(secret.store(cbor) == fhse::status::success);
       EXPECT(!cbor.empty());
 
@@ -171,8 +180,12 @@ FHSE_CASE("cpp interface")
     {
       std::vector<std::uint8_t> cbor1;
       std::vector<std::uint8_t> cbor2;
-      EXPECT(secret.add_key(to_view(key2)) == fhse::status::success);
-      EXPECT(secret.add_key(to_view(key3)) == fhse::status::success);
+      EXPECT(secret.add_key(to_view(cred2), to_view(key2)) == fhse::status::success);
+      EXPECT(secret.add_key(to_view(id3), to_view(key3)) == fhse::status::success);
+      EXPECT(secret.cred_count() == 2);
+      EXPECT(secret.cred(0) == to_view(cred2));
+      EXPECT(secret.cred(1) == to_view(id3));
+      EXPECT(secret.cred(2) == fhse_cview_t{});
       EXPECT(secret.store(cbor1) == fhse::status::success);
       EXPECT(secret.remove_key(to_view(key2)) == fhse::status::success);
       EXPECT(secret.remove_key(to_view(key2)) == fhse::status(fhse_key_unavailable));
@@ -186,9 +199,14 @@ FHSE_CASE("cpp interface")
 
     SECTION("multiple keys")
     {
-      EXPECT(secret.add_key(to_view(key1)) == fhse::status::success);
-      EXPECT(secret.add_key(to_view(key2)) == fhse::status::success);
-      EXPECT(secret.add_key(to_view(key3)) == fhse::status::success);
+      EXPECT(secret.add_key(to_view(cred1), to_view(key1)) == fhse::status::success);
+      EXPECT(secret.add_key(to_view(cred2), to_view(key2)) == fhse::status::success);
+      EXPECT(secret.add_key(to_view(id3), to_view(key3)) == fhse::status::success);
+      EXPECT(secret.cred_count() == 2);
+      EXPECT(secret.cred(0) == to_view(cred1));
+      EXPECT(secret.cred(1) == to_view(cred2));
+      EXPECT(secret.cred(2) == to_view(id3));
+      EXPECT(secret.cred(3) == fhse_cview_t{});
 
       std::vector<std::uint8_t> cbor;
       EXPECT(secret.store(cbor) == fhse::status::success);
@@ -203,18 +221,22 @@ FHSE_CASE("cpp interface")
 
     SECTION("move")
     {
+      EXPECT(secret.add_key(to_view(cred1), to_view(key1)) == fhse::status::success);
+
       std::vector<std::uint8_t> cbor;
       const fhse::secret secret2{std::move(secret)};
       EXPECT(secret.get_ascii_secret() == nullptr);
       EXPECT(secret.get_secret() == fhse_cview_t{});
       EXPECT(secret.fido_userid() == fhse_cview_t{});
       EXPECT(secret.fido_salt() == fhse_cview_t{});
+      EXPECT(secret.cred_count() == 0);
       EXPECT(secret.open(to_view(pass1), to_view(seed1)) == fhse::status(fhse_bad_argument));
       EXPECT(secret.unlock(to_view(seed1_bin)) == fhse::status(fhse_bad_argument));
       EXPECT(secret.store(cbor) == fhse::status(fhse_bad_argument));
  
       EXPECT(secret2.fido_userid().length == 64);
       EXPECT(secret2.fido_salt().length == 32);
+      EXPECT(secret2.cred_count() == 1);
 
       EXPECT(secret2.get_ascii_secret() != nullptr);
       EXPECT(secret2.get_ascii_secret() == std::string{seed1_z85});

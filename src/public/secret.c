@@ -137,7 +137,7 @@ fhse_cview_t fhse_secret_fido_salt(fhse_secret_t* self)
   return out;
 }
 
-int fhse_free(fhse_secret_t* self, fhse_bytes_t* bytes)
+int fhse_secret_bytes_free(fhse_secret_t* self, fhse_bytes_t* bytes)
 {
   if (!self || !bytes)
     return fhse_bad_argument;
@@ -231,6 +231,24 @@ int fhse_secret_store(fhse_secret_t* self, fhse_bytes_t* out)
   return rc;
 }
 
+size_t fhse_secret_cred_count(fhse_secret_t* self)
+{
+  if (!self)
+    return 0;
+  return self->core.keys.count;
+}
+
+fhse_cview_t fhse_secret_cred(fhse_secret_t* self, size_t i)
+{
+  fhse_cview_t out = {0};
+  if (self && i < self->core.keys.count)
+  {
+    out.data = (self->core.keys.data + i)->fido_cred.data;
+    out.length = (self->core.keys.data + i)->fido_cred.length;
+  }
+  return out;
+}
+
 int fhse_secret_unlock(fhse_secret_t* self, fhse_cview_t hmac_secret)
 {
   if (!self)
@@ -238,11 +256,11 @@ int fhse_secret_unlock(fhse_secret_t* self, fhse_cview_t hmac_secret)
   return fhse_core_unlock(&self->core, hmac_secret, &self->crypto, &self->memory);
 }
 
-int fhse_secret_add_key(fhse_secret_t* self, fhse_cview_t hmac_secret)
+int fhse_secret_add_key(fhse_secret_t* self, fhse_cview_t fido_cred, fhse_cview_t hmac_secret)
 {
   if (!self)
     return fhse_bad_argument;
-  return fhse_core_add_key(&self->core, hmac_secret, &self->crypto, &self->memory);
+  return fhse_core_add_key(&self->core, fido_cred, hmac_secret, &self->crypto, &self->memory);
 }
 
 int fhse_secret_remove_key(fhse_secret_t* self, fhse_cview_t hmac_secret)

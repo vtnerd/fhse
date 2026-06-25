@@ -43,9 +43,10 @@ int fhse_key_unpack(fhse_key_t* self, cbor_item_t* parent, fhse_memory_t const* 
     return fhse_bad_argument;
 
   int rc = fhse_success;
-  FHSE_CBOR_MAP_START(2, 2)
+  FHSE_CBOR_MAP_START(3, 3)
   {
     FHSE_CBOR_UNPACK(kdf_name, fhse_bytes_unpack);
+    FHSE_CBOR_UNPACK(fido_cred, fhse_sbytes_unpack);
     FHSE_CBOR_UNPACK(aead, fhse_aead_unpack);
   }
   FHSE_CBOR_MAP_END()
@@ -61,12 +62,15 @@ int fhse_key_pack(fhse_key_t* self, fhse_cbor_t* out, fhse_memory_t const* memor
     return fhse_bad_argument;
 
   int rc = fhse_success;
-  FHSE_CBOR_WRITE(cbor_encode_map_start(2, out->write_ptr, out->remaining));
+  FHSE_CBOR_WRITE(cbor_encode_map_start(3, out->write_ptr, out->remaining));
   if (rc != fhse_success)
     return rc;
 
   FHSE_TRY(fhse_cbor_field(out, "aead", memory));
   FHSE_TRY(fhse_aead_pack(&self->aead, out, memory));
+
+  FHSE_TRY(fhse_cbor_field(out, "fido_cred", memory));
+  FHSE_TRY(fhse_sbytes_pack(&self->fido_cred, out, memory));
 
   FHSE_TRY(fhse_cbor_field(out, "kdf_name", memory));
   FHSE_TRY(fhse_bytes_pack_string(&self->kdf_name, out, memory));
@@ -80,6 +84,7 @@ int fhse_key_move(fhse_key_t* self, fhse_key_t* src, fhse_memory_t const* memory
     return fhse_bad_argument;
 
   fhse_bytes_move(&self->kdf_name, &src->kdf_name, memory);
+  fhse_sbytes_move(&self->fido_cred, &src->fido_cred, memory);
   fhse_aead_move(&self->aead, &src->aead, memory);
   return fhse_success;
 }
@@ -89,6 +94,7 @@ int fhse_key_free(fhse_key_t* self, fhse_memory_t const* memory)
   if (!self || !memory)
     return fhse_bad_argument;
   fhse_bytes_free(&self->kdf_name, memory);
+  fhse_sbytes_free(&self->fido_cred, memory);
   fhse_aead_free(&self->aead, memory);
   memset(self, 0, sizeof(fhse_key_t));
   return fhse_success;
@@ -225,7 +231,7 @@ int fhse_keys_try_open(fhse_keys_t* self, fhse_sbytes_t* out, size_t* index, fhs
   return fhse_key_unavailable;
 }
 
-int fhse_keys_add(fhse_keys_t* self, fhse_cview_t root_secret, fhse_cview_t hmac_secret, fhse_crypto_t const* crypto, fhse_memory_t const* memory)
+int fhse_keys_add(fhse_keys_t* self, fhse_cview_t root_secret, fhse_cview_t fido_cred, fhse_cview_t hmac_secret, fhse_crypto_t const* crypto, fhse_memory_t const* memory)
 {
   if (!self || self->count == SIZE_MAX || !root_secret.data)
     return fhse_bad_argument;
@@ -245,11 +251,13 @@ int fhse_keys_add(fhse_keys_t* self, fhse_cview_t root_secret, fhse_cview_t hmac
 
   fhse_key_t latest = {0};
   rc = fhse_sbytes_realloc(&latest.aead.payload, root_secret.length, memory);
+  FHSE_CHECK(fhse_sbytes_realloc(&latest.fido_cred, fido_cred.length, memory));
   if (rc == fhse_success)
   {
     fhse_sbytes_t encrypted = {0};
     latest.aead.key_length = crypto->aead_key_length;
     memcpy(latest.aead.payload.data, root_secret.data, root_secret.length);
+    memcpy(latest.fido_cred.data, fido_cred.data, fido_cred.length);
     rc = fhse_key_try_open(&latest, &encrypted, hmac_secret, crypto, memory);
 
     FHSE_CHECK(fhse_sbytes_move(&latest.aead.payload, &encrypted, memory));

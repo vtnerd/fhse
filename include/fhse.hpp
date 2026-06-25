@@ -60,6 +60,10 @@ namespace fhse
       return "failed to unlock data with given password or FIDO key";
     case fhse_duplicate_key:
       return "FIDO key is already enrolled";
+    case fhse_fido_failure:
+      return "Error occured in libfido2 library";
+    case fhse_fido_needs_pin:
+      return "Fido operation requires PIN";
     case fhse_key_unavailable:
       return "FIDO key is not enrolled";
     case fhse_mlock_failure:
@@ -100,6 +104,17 @@ namespace fhse
     };
   }
 
+  fhse_cview_t to_cview(const fhse_sbytes_t val)
+  {
+    return fhse_cview_t{.data = val.data, .length = val.length };
+  }
+
+  template<typename T>
+  fhse_cviews_t to_cviews(const T& val)
+  {
+    return fhse_cviews_t{.data = val.data(), .count = val.size()};
+  }
+
   struct free_secret
   {
     void operator()(fhse_secret_t* ptr) const noexcept
@@ -111,7 +126,7 @@ namespace fhse
     std::unique_ptr<fhse_secret_t, free_secret> self_;
 
   public:
-    explicit secret(fhse_memory_t* memory = nullptr, fhse_crypto_t* crypto = nullptr)
+    explicit secret(fhse_memory_t const* memory = nullptr, fhse_crypto_t const* crypto = nullptr)
       : self_(nullptr)
     {
       fhse_secret_t* self = nullptr;
@@ -131,6 +146,9 @@ namespace fhse
 
     fhse_cview_t fido_userid() const noexcept { return fhse_secret_fido_userid(self_.get()); } 
     fhse_cview_t fido_salt() const noexcept { return fhse_secret_fido_salt(self_.get()); }
+
+    std::size_t cred_count() const noexcept { return fhse_secret_cred_count(self_.get()); }
+    fhse_cview_t cred(std::size_t i) const noexcept { return fhse_secret_cred(self_.get(), i); }
  
     status create(fhse_cview_t pass, fhse_cview_t seed = {}) noexcept
     { return status(fhse_secret_create(self_.get(), pass, seed)); }
@@ -147,19 +165,106 @@ namespace fhse
         try { out.assign(temp.data, temp.data + temp.length); }
         catch (...) { rc = fhse_bad_alloc; }
       }
-      fhse_free(self_.get(), &temp);
+      fhse_secret_bytes_free(self_.get(), &temp);
       return status(rc);
     }
 
     status unlock(fhse_cview_t hmac_secret) noexcept
     { return status(fhse_secret_unlock(self_.get(), hmac_secret)); }
 
-    status add_key(fhse_cview_t hmac_secret) noexcept
-    { return status(fhse_secret_add_key(self_.get(), hmac_secret)); }
+    status add_key(fhse_cview_t fido_id, fhse_cview_t hmac_secret) noexcept
+    { return status(fhse_secret_add_key(self_.get(), fido_id, hmac_secret)); }
 
     status remove_key(fhse_cview_t hmac_secret) noexcept
     { return status(fhse_secret_remove_key(self_.get(), hmac_secret)); }
-  }; 
+  };
+
+  struct free_device
+  {
+    void operator()(fhse_device_t* ptr) const noexcept
+    { fhse_device_free(&ptr); }
+  };
+
+  struct device
+  {
+    std::unique_ptr<fhse_device_t, free_device> self_;
+
+    struct unlock_op
+    {
+      status operator()(secret& sec, fhse_cview_t hmac_secret) const noexcept
+      { return sec.unlock(hmac_secret); }
+    };
+
+    struct remove_key_op
+    {
+      status operator()(secret& sec, fhse_cview_t hmac_secret) const noexcept
+      { return sec.remove_key(hmac_secret); }
+    };
+
+    template<typename F>
+    status run_op(secret& sec, const char* pin, const F f) noexcept
+    {
+      std::vector<fhse_cview_t> keys{};
+      {
+        const std::size_t cred_count = sec.cred_count();
+        for (std::size_t i = 0; i < cred_count; ++i)
+          keys.push_back(sec.cred(i));
+      }
+
+      fhse_sbytes_t hmac_secret = {0};
+      status rc = status(fhse_device_get_hmac_secret(self_.get(), &hmac_secret, to_cviews(keys), sec.fido_salt(), pin));
+      if (rc == status::success)
+        rc = f(sec, to_cview(hmac_secret));
+      fhse_device_sbytes_free(self_.get(), &hmac_secret);
+      return rc;
+    }
+
+  public:
+    explicit device(const char* path, fhse_memory_t const* memory = nullptr)
+      : self_(nullptr)
+    {
+      fhse_device_t* self = nullptr;
+      int rc = fhse_device_construct(&self, path, memory);
+      if (rc != fhse_success)
+        throw std::system_error{make_error_code(status(rc)), "fhse::device constructor"};
+      self_.reset(self);
+    }
+
+    device(device&&) noexcept = default;
+    device(const device&) noexcept = delete;
+    device& operator=(device&&) noexcept = default;
+    device& operator=(const device&) noexcept = delete;
+
+    status cancel() noexcept { return status(fhse_device_cancel(self_.get())); }
+
+    // These functions block on user device interaction. Use `std::async`
+    // with cancel function.
+
+    status unlock(secret& sec, const char* pin = nullptr) noexcept
+    { return run_op(sec, pin, unlock_op{}); }
+
+    status add_to(secret& sec, const char* pin = nullptr) noexcept
+    {
+      fhse_sbytes_t cred = {0};
+      fhse_sbytes_t hmac_secret = {0};
+      status rc = status(fhse_device_generate_cred(self_.get(), &cred, sec.fido_userid(), pin));
+      if (rc == status::success)
+      {
+        const fhse_cview_t cred_view = to_cview(cred);
+        const fhse_cviews_t creds{.data = &cred_view, .count = 1};
+        rc = status(fhse_device_get_hmac_secret(self_.get(), &hmac_secret, creds, sec.fido_salt(), pin));
+        if (rc == status::success)
+          rc = sec.add_key(to_cview(cred), to_cview(hmac_secret));
+      }
+      
+      fhse_device_sbytes_free(self_.get(), &cred);
+      fhse_device_sbytes_free(self_.get(), &hmac_secret);
+      return rc;
+    }
+
+    status remove_from(secret& sec, const char* pin = nullptr) noexcept
+    { return run_op(sec, pin, remove_key_op{}); }
+  };
 }
 
 namespace std

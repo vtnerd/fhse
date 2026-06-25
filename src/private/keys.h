@@ -40,6 +40,7 @@
 typedef struct fhse_key_t
 {
   fhse_bytes_t kdf_name;
+  fhse_sbytes_t fido_cred;
   fhse_aead_t aead;
 } fhse_key_t;
 
@@ -63,7 +64,7 @@ int fhse_keys_free(fhse_keys_t* self, fhse_memory_t const* memory);
 
 int fhse_keys_try_open(fhse_keys_t* self, fhse_sbytes_t* out, size_t* index, fhse_cview_t hmac_secret, fhse_crypto_t const* crypto, fhse_memory_t const* memory);
 
-int fhse_keys_add(fhse_keys_t* self, fhse_cview_t root_secret, fhse_cview_t hmac_secret, fhse_crypto_t const* crypto, fhse_memory_t const* memory);
+int fhse_keys_add(fhse_keys_t* self, fhse_cview_t root_secret, fhse_cview_t fido_cred, fhse_cview_t hmac_secret, fhse_crypto_t const* crypto, fhse_memory_t const* memory);
 int fhse_keys_remove(fhse_keys_t* self, size_t index, fhse_memory_t const* memory);
 
 #endif // FHSE_KEYS_H
