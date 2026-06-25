@@ -1,4 +1,6 @@
 #include <cstdint>
+#include <cstdio>
+#include <cstring>
 #ifdef USE_LIBFIDO2
  #include <fido.h>
 #else
@@ -46,26 +48,51 @@ int main()
     {
       if (count)
       {
+        fhse::device device{fido_dev_info_path(fido_dev_info_ptr(info.get(), 0))};
         std::cout << "Press user presence twice" << std::endl;
 
-        std::vector<std::uint8_t> cbor;
+        char pin_buffer[256] = {0};
+        const char* pin = nullptr;
         fhse::secret secret{};
-        fhse::device device{fido_dev_info_path(fido_dev_info_ptr(info.get(), 0))};
         fhse::status rc = secret.create(fhse::to_cview(std::string{pass}));
-        FHSE_STATUS(device.add_to(secret));
-        FHSE_STATUS(secret.store(cbor));
+
+        do
+        {
+          if (rc == fhse::status(fhse_fido_needs_pin))
+          {
+            count = 0;
+            std::cout << "Enter PIN: ";
+            static_assert(1 <= sizeof(pin_buffer));
+            if (std::fgets(pin_buffer, sizeof(pin_buffer) - 1, stdin))
+              rc = fhse::status::success;
+            else
+              rc = fhse::status(fhse_bad_argument);
+          }
+
+          FHSE_STATUS(device.add_to(secret, pin));
+        } while (rc == fhse::status(fhse_fido_needs_pin) && count);
+
+        std::vector<std::uint8_t> metadata;
+        FHSE_STATUS(secret.store(metadata));
 
         if (rc == fhse::status::success)
           std::cout << "Verifying secret, press user presence again" << std::endl;
 
-        fhse::secret secret2{};
-        FHSE_STATUS(secret2.open(fhse::to_cview(cbor), fhse::to_cview(std::string{pass})));
-        FHSE_STATUS(device.unlock(secret2));
+        fhse::secret on_next_open{};
+        FHSE_STATUS(on_next_open.open(fhse::to_cview(metadata), fhse::to_cview(std::string{pass})));
+        FHSE_STATUS(device.unlock(on_next_open, pin));
 
         if (rc == fhse::status::success)
         {
-          std::cout << "SUCCESS!" << std::endl;
-          return 0;
+          const char* const raw_secret1 = secret.get_ascii_secret();
+          const char* const raw_secret2 = on_next_open.get_ascii_secret();
+          if (raw_secret1 && raw_secret2 && std::strcmp(raw_secret1, raw_secret2) == 0)
+          {
+            std::cout << "SUCCESS!" << std::endl;
+            return 0;
+          }
+          else
+            std::cerr << "FATAL ERROR, RAW SECRETS DO NOT MATCH!" << std::endl;
         }
         else
           std::cerr << "FHSE error: " << get_string(rc) << std::endl;

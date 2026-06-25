@@ -258,7 +258,7 @@ int fhse_secret_unlock(fhse_secret_t* self, fhse_cview_t hmac_secret)
 
 int fhse_secret_add_key(fhse_secret_t* self, fhse_cview_t fido_cred, fhse_cview_t hmac_secret)
 {
-  if (!self)
+  if (!self || !fido_cred.data || !hmac_secret.data)
     return fhse_bad_argument;
   return fhse_core_add_key(&self->core, fido_cred, hmac_secret, &self->crypto, &self->memory);
 }
