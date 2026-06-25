@@ -67,8 +67,18 @@ struct fhse_device_t
 
 static int convert_rc(int rc)
 {
-  return rc != FIDO_ERR_SUCCESS ?
-    (rc == FIDO_ERR_PIN_REQUIRED ? fhse_fido_needs_pin : fhse_fido_failure) : fhse_success;
+  switch (rc)
+  {
+    default:
+      break;
+    case FIDO_ERR_SUCCESS:
+      return fhse_success;
+    case FIDO_ERR_PIN_REQUIRED:
+      return fhse_fido_needs_pin;
+    case FIDO_ERR_NO_CREDENTIALS:
+      return fhse_key_unavailable;
+  }
+  return fhse_fido_failure;
 }
 
 int fhse_device_construct(fhse_device_t** self, const char* path, struct fhse_memory_t const* memory)
