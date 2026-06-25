@@ -13,7 +13,7 @@ env:
         echo "Acquire::Retries \"3\";"         | sudo tee -a /etc/apt/apt.conf.d/80-custom
         echo "Acquire::http::Timeout \"120\";" | sudo tee -a /etc/apt/apt.conf.d/80-custom
         echo "Acquire::ftp::Timeout \"120\";"  | sudo tee -a /etc/apt/apt.conf.d/80-custom
-  BREW_INSTALL_MAC: 'HOMEBREW_NO_AUTO_UPDATE=1 brew install cmake libcbor libsodium'
+  BREW_INSTALL_MAC: 'HOMEBREW_NO_AUTO_UPDATE=1 brew install cmake libcbor libfido2 libsodium'
   CONFIGURE: '-B "$GITHUB_WORKSPACE/build" -DCMAKE_BUILD_TYPE=Release -DFHSE_TESTS=ON -S "$GITHUB_WORKSPACE"'
   BUILD: 'cmake --build "$GITHUB_WORKSPACE/build" -j$(nproc)'
   RUN: 'ctest --test-dir "$GITHUB_WORKSPACE/build" --output-on-failure'
@@ -53,7 +53,7 @@ jobs:
         run: |
           ${{env.APT_SET_CONF}}
           sudo apt update
-          sudo apt-get -y install build-essential cmake
+          sudo apt-get -y install build-essential cmake libcbor-dev
       - name: Install libsodium
         if: matrix.libsodium == 'ON'
         run: sudo apt-get -y install libsodium-dev
@@ -85,7 +85,7 @@ jobs:
         if: matrix.distro == 'archlinux:base-devel'
         run: |
           sudo pacman --noconfirm -Syu
-          sudo pacman --noconfirm -S cmake git libcbor libsodium
+          sudo pacman --noconfirm -S cmake git libcbor libfido2 libsodium
       - name: Checkout FHSE Source
         uses: actions/checkout@v4
         with:
