@@ -61,6 +61,7 @@ int main()
           if (rc == fhse::status(fhse_fido_needs_pin))
           {
             count = 0;
+            pin = pin_buffer;
             std::cout << "Enter PIN: ";
             static_assert(1 <= sizeof(pin_buffer));
             if (std::fgets(pin_buffer, sizeof(pin_buffer) - 1, stdin))
