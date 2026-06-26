@@ -16,7 +16,7 @@
 #include <memory>
 #include "fhse.hpp"
 
-#define FHSE_STATUS(...)             \
+#define CHECK(...)                   \
   do                                 \
   {                                  \
     if (rc == fhse::status::success) \
@@ -69,18 +69,18 @@ int main()
               rc = fhse::status(fhse_bad_argument);
           }
 
-          FHSE_STATUS(device.add_to(secret, pin));
+          CHECK(device.add_to(secret, pin));
         } while (rc == fhse::status(fhse_fido_needs_pin) && count);
 
         std::vector<std::uint8_t> metadata;
-        FHSE_STATUS(secret.store(metadata));
+        CHECK(secret.store(metadata));
 
         if (rc == fhse::status::success)
           std::cout << "Verifying secret, press user presence again" << std::endl;
 
         fhse::secret on_next_open{};
-        FHSE_STATUS(on_next_open.open(fhse::to_cview(metadata), fhse::to_cview(std::string{pass})));
-        FHSE_STATUS(device.unlock(on_next_open, pin));
+        CHECK(on_next_open.open(fhse::to_cview(metadata), fhse::to_cview(std::string{pass})));
+        CHECK(device.unlock(on_next_open, pin));
 
         if (rc == fhse::status::success)
         {
