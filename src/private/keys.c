@@ -126,6 +126,8 @@ static int fhse_keys_resize(fhse_keys_t* self, size_t count, fhse_memory_t const
     return fhse_bad_argument;
   if (count == self->count)
     return fhse_success;
+  if (SIZE_MAX / sizeof(fhse_key_t) < count)
+    return fhse_bad_alloc;
 
   size_t next_size = sizeof(fhse_key_t) * count;
   fhse_key_t* next = count ? memory->realloc(NULL, next_size, memory->context) : NULL;
